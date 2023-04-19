@@ -4,17 +4,20 @@ cfg = Config()
 
 if cfg.use_vicuna:
     import torch
-    from transformers import AutoTokenizer, AutoModelForCausalLM, LLaMATokenizer, AutoModel
+    from transformers import AutoTokenizer, AutoModelForCausalLM, AutoModel
 
     from fastchat.conversation import conv_templates, SeparatorStyle
     from fastchat.serve.compression import compress_module
     from fastchat.serve.monkey_patch_non_inplace import replace_llama_attn_with_non_inplace_operations
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path("repositories/GPTQ-for-LLaMa")))
+    import llama_inference_offload
 else:
     torch = None
     Tokenizer = None
     AutoTokenizer = None
     AutoModelForCausalLM = None
-    LLaMATokenizer = None
     AutoModel = None
     conv_templates = None
     SeparatorStyle = None
@@ -29,7 +32,7 @@ class VicunaModel(metaclass=Singleton):
         llm_device = cfg.llm_device
         num_gpus = 1  # cfg.num_gpus
         load_8bit = False  # cfg.load_8bit
-        self.conv = conv_templates["bair_v1"].copy()
+        self.conv = conv_templates["vicuna_v1.1"].copy()
         self.conv.roles = ("system", "user", 'assistant', 'gpt')
         self.conv.sep = "###"
         self.conv.sep_style = SeparatorStyle.SINGLE
@@ -78,8 +81,12 @@ def load_model(model_name, device, num_gpus, load_8bit=False, debug=False):
         model = AutoModel.from_pretrained(model_name, trust_remote_code=True).half().cuda()
     else:
         tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=False)
-        model = AutoModelForCausalLM.from_pretrained(model_name,
-            low_cpu_mem_usage=True, **kwargs)
+        path_to_model = "models/TheBloke_vicuna-7B-1.1-GPTQ-4bit-128g"
+        pt_path = "models/TheBloke_vicuna-7B-1.1-GPTQ-4bit-128g/vicuna-7B-1.1-GPTQ-4bit-128g.safetensors"
+        wbits = 4
+        groupsize = 128
+        pre_layer = 0
+        model = llama_inference_offload.load_quant(str(path_to_model), str(pt_path), wbits, groupsize, pre_layer)
 
     # calling model.cuda() mess up weights if loading 8-bit weights
     if device == "cuda" and num_gpus == 1 and not load_8bit:
