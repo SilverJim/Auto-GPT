@@ -283,7 +283,7 @@ full_message_history = []
 result = None
 next_action_count = 0
 # Make a constant:
-user_input = "Determine which next command to use, and respond using the format specified above:"
+user_input = "Determine which next command to use to achieve GOALS, and respond using the format specified above."
 
 # raise an exception if pinecone_api_key or region is not provided
 if not cfg.pinecone_api_key or not cfg.pinecone_region: raise Exception("Please provide pinecone_api_key and pinecone_region")

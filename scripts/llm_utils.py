@@ -3,6 +3,7 @@ from config import Config
 import os
 
 from llm_models import VicunaModel
+from callbacks import Iteratorize, AutoGPTStoppingCriteria, Stream, clear_torch_cache
 
 
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:768"
@@ -43,7 +44,7 @@ def create_chat_completion(messages, model=None, temperature=None, max_tokens=No
 
 @torch.inference_mode()
 def generate_stream(model, tokenizer, params, device,
-                    context_len=2048, stream_interval=2):
+                    context_len=4096, stream_interval=2):
     prompt = params["prompt"]
     l_prompt = len(prompt)
     temperature = float(params.get("temperature", 0.7))
@@ -104,71 +105,76 @@ def generate_stream(model, tokenizer, params, device,
 
     del past_key_values
 
+def generate_stream_v2(model, prompt, tokenizer, params, device):
+    input_ids = tokenizer.encode(prompt, return_tensors="pt").to("cuda:0")
+    generate_params = {}
+    generate_params.update(params)
+    generate_params["inputs"] = input_ids
+    
+    def generate_with_callback(callback=None, **kwargs):
+        kwargs['stopping_criteria'].insert(0, Stream(callback_func=callback))
+        clear_torch_cache()
+        with torch.no_grad():
+           model.generate(**kwargs)
+
+    def generate_with_streaming(**kwargs):
+        return Iteratorize(generate_with_callback, kwargs, callback=None)
+
+
+    with generate_with_streaming(**generate_params) as generator:
+        for output in generator:
+            # if shared.soft_prompt:
+            #     output = torch.cat((input_ids[0], output[filler_input_ids.shape[1]:]))
+
+            new_tokens = len(output) - len(input_ids[0])
+            reply = tokenizer.decode(output[-new_tokens:])
+            yield reply
 
 def create_vicuna_completions(messages):
-    results = [vicuna_interact(message) for message in messages]
+    result = vicuna_interact(messages)
     if cfg.debug:
-        print("results", [results])
-    result = None
-    for result in results:
-        if isinstance(result, list):
-            for item in result:
-                if item.startswith("{"):
-                    result = item
-                    break
-    if cfg.debug:
-        print("result", result)
+        print("results", result)
     return result
 
 
-def vicuna_interact(message, temperature=0.7, max_new_tokens=512):
+def vicuna_interact(messages, temperature=0.7, max_new_tokens=1024):
     # model_name = args.model_name
     instance = VicunaModel()
     model = instance.model
     tokenizer = instance.tokenizer
+    content = "\n".join(item["content"] for item in messages)
     # Chat
     if cfg.debug:
-        print(message)
+        print(content)
     conv = instance.conv
-    role = message['role']
-    if role == 'system':
-        if conv.system == "":
-            conv.system = message['content']
-            return ""
-        if message['content'].startswith("Permanent"):
-            conv.append_message(conv.roles[0], message['content'])
-    if role == 'user':
-        conv.append_message(conv.roles[1], message['content'])
-    if role == 'assistant':
-        if message['content'] == '' or len(message['content']) < 10:
-            return ""
-    #    conv.append_message(conv.roles[2], message['content'])
-    #if role == 'gpt':
-    #    conv.append_message(conv.roles[3], message['content'])
-    conv.append_message(conv.roles[3], None)
-    generate_stream_func = generate_stream
+    conv.append_message(conv.roles[0], content)
+    conv.append_message(conv.roles[1], None)
+    generate_stream_func = generate_stream_v2
     prompt = conv.get_prompt()
-    skip_echo_len = len(prompt) + 1
+    skip_echo_len = len(prompt)
     # print(prompt)
     params = {
-        "model": cfg.vicuna_path,
-        "prompt": prompt,
         "temperature": temperature,
         "max_new_tokens": max_new_tokens,
-        "stop": conv.sep if conv.sep_style == SeparatorStyle.SINGLE else conv.sep2,
+        "do_sample": True,
+        "top_p": 0.8,
+        "top_k": 0,
+        "typical_p": 0.19,
+        "repetition_penalty": 1.1,
+        "stopping_criteria": [AutoGPTStoppingCriteria(tokenizer=tokenizer, prompt=prompt)],
+        "min_length": 1024,
     }
     pre = 0
-    for outputs in generate_stream_func(model, tokenizer, params, cfg.llm_device):
-        outputs = outputs[skip_echo_len:].strip()
-        outputs = outputs.split(" ")
-        now = len(outputs)
-        if now - 1 > pre:
-            print(" ".join(outputs[pre:now-1]), end=" ", flush=True)
-            pre = now - 1
-    # print(" ".join(outputs[pre:]), flush=True)
-    output =  " ".join(outputs)
-    conv.messages[-1][-1] = output
-
+    reply = ""
+    for output in generate_stream_func(model, prompt, tokenizer, params, cfg.llm_device):
+        now = len(output)
+        if now > pre:
+            print(output[pre:now],end="")
+            pre = now
+        reply = output
+    print()
+    conv.messages[-1][-1] = reply
+    reply = reply.replace("\\_", "_").replace("\\n", "\n").replace("\\\\", "\\")
     if cfg.debug:
-        print([output])
-    return output
+        print(reply)
+    return reply
