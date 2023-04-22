@@ -32,15 +32,6 @@ class VicunaModel(metaclass=Singleton):
         llm_device = cfg.llm_device
         num_gpus = 1  # cfg.num_gpus
         load_8bit = False  # cfg.load_8bit
-        self.conv =  Conversation(
-            system="",
-            roles=('### USER', '### ASSISTANT'),
-            messages=[],
-            offset=0,
-            sep_style=SeparatorStyle.DOLLY,
-            sep="\n\n",
-            sep2="</s>",
-        )
         print("Loading Vicuna model...")
 
     # Model

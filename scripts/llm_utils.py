@@ -5,6 +5,8 @@ import os
 from llm_models import VicunaModel
 from callbacks import Iteratorize, AutoGPTStoppingCriteria, Stream, clear_torch_cache
 
+from itertools import groupby
+from fastchat.conversation import SeparatorStyle, Conversation
 
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:768"
 cfg = Config()
@@ -136,23 +138,37 @@ def create_vicuna_completions(messages):
         print("results", result)
     return result
 
+def get_prompt_for_vicuna(messages, conv):
+    role_map = {
+        "system": conv.roles[0],
+        "user": conv.roles[0],
+        "assistant": conv.roles[1],
+    }
+    
+    for role, group in groupby(messages, key=lambda x: role_map[x["role"]]):
+        content = "\n\n".join(x["content"] for x in group)
+        conv.append_message(role, content)
+    conv.append_message(conv.roles[1], None)
+    prompt = conv.get_prompt()
+    return prompt
 
-def vicuna_interact(messages, temperature=0.7, max_new_tokens=1024):
+def vicuna_interact(messages, temperature=0.7, max_new_tokens=2048):
     # model_name = args.model_name
     instance = VicunaModel()
     model = instance.model
+    conv =  Conversation(
+            system="",
+            roles=('### USER', '### ASSISTANT'),
+            messages=[],
+            offset=0,
+            sep_style=SeparatorStyle.DOLLY,
+            sep="\n\n",
+            sep2="",
+    )
     tokenizer = instance.tokenizer
-    content = "\n".join(item["content"] for item in messages)
-    # Chat
-    if cfg.debug:
-        print(content)
-    conv = instance.conv
-    conv.append_message(conv.roles[0], content)
-    conv.append_message(conv.roles[1], None)
     generate_stream_func = generate_stream_v2
-    prompt = conv.get_prompt()
-    skip_echo_len = len(prompt)
-    # print(prompt)
+    prompt = get_prompt_for_vicuna(messages, conv)
+    print(prompt)
     params = {
         "temperature": temperature,
         "max_new_tokens": max_new_tokens,
@@ -162,7 +178,6 @@ def vicuna_interact(messages, temperature=0.7, max_new_tokens=1024):
         "typical_p": 0.19,
         "repetition_penalty": 1.1,
         "stopping_criteria": [AutoGPTStoppingCriteria(tokenizer=tokenizer, prompt=prompt)],
-        "min_length": 1024,
     }
     pre = 0
     reply = ""

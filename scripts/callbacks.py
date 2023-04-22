@@ -40,9 +40,10 @@ class AutoGPTStoppingCriteria(transformers.StoppingCriteria):
     def __call__(self, input_ids, scores):
         text = self.tokenizer.decode(input_ids[0])
         match = self.regex.search(text)
-        if match is not None and match.start() > self.prompt_length:
-            print(text)
-        return match is not None and match.start() > self.prompt_length
+        stop = match is not None and match.start() > self.prompt_length
+        if stop:
+            print("Stopping criteria met")
+        return stop
 
 class Stream(transformers.StoppingCriteria):
     def __init__(self, callback_func=None):

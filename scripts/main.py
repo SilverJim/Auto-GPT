@@ -294,7 +294,6 @@ print('Using memory of type: ' + memory.__class__.__name__)
 
 # Interaction Loop
 while True:
-    VicunaModel().conv.messsage = ()
     # Send message to AI, get response
     #with Spinner("Thinking... "):
     assistant_reply = chat.chat_with_ai(
