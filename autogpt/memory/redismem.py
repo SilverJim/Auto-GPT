@@ -86,17 +86,9 @@ class RedisMemory(MemoryProviderSingleton):
 
         Returns: Message indicating that the data has been added.
         """
-<<<<<<< HEAD:scripts/memory/redismem.py
-        if 'Command Error:' in data:
-            return ""
-        vector = get_ada_embedding(data)
-        if vector is None:
-            return ""
-=======
         if "Command Error:" in data:
             return ""
         vector = create_embedding_with_ada(data)
->>>>>>> upstream/stable:autogpt/memory/redismem.py
         vector = np.array(vector).astype(np.float32).tobytes()
         data_dict = {b"data": data, "embedding": vector}
         pipe = self.redis.pipeline()

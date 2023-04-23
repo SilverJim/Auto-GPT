@@ -27,7 +27,6 @@ else:
 
 class VicunaModel(metaclass=Singleton):
     def __init__(self, max_tokens=512, max_batch_size=32):
-        
         model_name = cfg.vicuna_path
         llm_device = cfg.llm_device
         num_gpus = 1  # cfg.num_gpus

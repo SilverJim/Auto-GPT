@@ -121,14 +121,8 @@ class LocalCache(MemoryProviderSingleton):
 
         Returns: List[str]
         """
-<<<<<<< HEAD:scripts/memory/local.py
-        embedding = get_ada_embedding(text)
-        if embedding is None:
-            return []
-=======
         embedding = create_embedding_with_ada(text)
 
->>>>>>> upstream/stable:autogpt/memory/local.py
         scores = np.dot(self.data.embeddings, embedding)
 
         top_k_indices = np.argsort(scores)[-k:][::-1]
