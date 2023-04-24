@@ -119,6 +119,12 @@ class Config(metaclass=Singleton):
         self.memory_index = os.getenv("MEMORY_INDEX", "auto-gpt")
         # Note that indexes must be created on db 0 in redis, this is not configurable.
 
+        self.use_vicuna = os.getenv("USE_VICUNA", "True") == 'True'
+        self.vicuna_path = os.getenv("VICUNA_PATH")
+        self.llm_device = os.getenv("LLM_DEVICE", "cuda")
+        self.tokenizer_path = os.getenv("TOKENIZER_PATH")
+        self.debug = os.getenv("DEBUG", "False") == 'True'
+
         self.memory_backend = os.getenv("MEMORY_BACKEND", "local")
         # Initialize the OpenAI API client
         openai.api_key = self.openai_api_key
@@ -180,6 +186,10 @@ class Config(metaclass=Singleton):
     def set_continuous_limit(self, value: int) -> None:
         """Set the continuous limit value."""
         self.continuous_limit = value
+
+    def set_debug(self, value: bool):
+        self.debug = value
+
 
     def set_speak_mode(self, value: bool) -> None:
         """Set the speak mode value."""

@@ -14,6 +14,26 @@ CFG = Config()
 
 openai.api_key = CFG.openai_api_key
 
+import os
+
+from llm_models import VicunaModel
+from callbacks import Iteratorize, AutoGPTStoppingCriteria, Stream, clear_torch_cache
+
+from itertools import groupby
+
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:768"
+cfg = Config()
+
+if CFG.use_vicuna:
+    import torch
+    from fastchat.conversation import SeparatorStyle, Conversation
+else:
+    torch = None
+    SeparatorStyle = None
+    Conversation = None
+
+
+
 
 def call_ai_function(
     function: str, args: list, description: str, model: str | None = None
@@ -81,7 +101,9 @@ def create_chat_completion(
     for attempt in range(num_retries):
         backoff = 2 ** (attempt + 2)
         try:
-            if CFG.use_azure:
+            if CFG.use_vicuna:
+                return create_vicuna_completions(messages)
+            elif CFG.use_azure:
                 response = openai.ChatCompletion.create(
                     deployment_id=CFG.get_azure_deployment_id_for_model(model),
                     model=model,
@@ -137,6 +159,93 @@ def create_chat_completion(
 
     return response.choices[0].message["content"]
 
+
+def generate_vicuna_stream(model, prompt, tokenizer, params, device):
+    input_ids = tokenizer.encode(prompt, return_tensors="pt").to("cuda:0")
+    generate_params = {}
+    generate_params.update(params)
+    generate_params["inputs"] = input_ids
+    
+    def generate_with_callback(callback=None, **kwargs):
+        kwargs['stopping_criteria'].insert(0, Stream(callback_func=callback))
+        clear_torch_cache()
+        with torch.no_grad():
+           model.generate(**kwargs)
+
+    def generate_with_streaming(**kwargs):
+        return Iteratorize(generate_with_callback, kwargs, callback=None)
+
+
+    with generate_with_streaming(**generate_params) as generator:
+        for output in generator:
+            # if shared.soft_prompt:
+            #     output = torch.cat((input_ids[0], output[filler_input_ids.shape[1]:]))
+
+            new_tokens = len(output) - len(input_ids[0])
+            reply = tokenizer.decode(output[-new_tokens:])
+            yield reply
+
+def create_vicuna_completions(messages):
+    result = vicuna_interact(messages)
+    if CFG.debug:
+        print("results", result)
+    return result
+
+def get_prompt_for_vicuna(messages, conv):
+    role_map = {
+        "system": conv.roles[0],
+        "user": conv.roles[0],
+        "assistant": conv.roles[1],
+    }
+    
+    for role, group in groupby(messages, key=lambda x: role_map[x["role"]]):
+        content = "\n\n".join(x["content"] for x in group)
+        conv.append_message(role, content)
+    conv.append_message(conv.roles[1], None)
+    prompt = conv.get_prompt()
+    return prompt
+
+def vicuna_interact(messages, temperature=0.7, max_new_tokens=2048):
+    # model_name = args.model_name
+    instance = VicunaModel()
+    model = instance.model
+    conv =  Conversation(
+            system="",
+            roles=('### USER', '### ASSISTANT'),
+            messages=[],
+            offset=0,
+            sep_style=SeparatorStyle.DOLLY,
+            sep="\n\n",
+            sep2="",
+    )
+    tokenizer = instance.tokenizer
+    generate_stream_func = generate_vicuna_stream
+    prompt = get_prompt_for_vicuna(messages, conv)
+    print(prompt)
+    params = {
+        "temperature": temperature,
+        "max_new_tokens": max_new_tokens,
+        "do_sample": True,
+        "top_p": 0.8,
+        "top_k": 0,
+        "typical_p": 0.19,
+        "repetition_penalty": 1.1,
+        "stopping_criteria": [AutoGPTStoppingCriteria(tokenizer=tokenizer, prompt=prompt)],
+    }
+    pre = 0
+    reply = ""
+    for output in generate_stream_func(model, prompt, tokenizer, params, CFG.llm_device):
+        now = len(output)
+        if now > pre:
+            print(output[pre:now],end="")
+            pre = now
+        reply = output
+    print()
+    conv.messages[-1][-1] = reply
+    reply = reply.replace("\\_", "_").replace("\\n", "\n").replace("\\\\", "\\")
+    if CFG.debug:
+        print(reply)
+    return reply
 
 def create_embedding_with_ada(text) -> list:
     """Create an embedding with text-ada-002 using the OpenAI SDK"""

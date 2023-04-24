@@ -71,14 +71,14 @@ class Agent:
                 break
 
             # Send message to AI, get response
-            with Spinner("Thinking... "):
-                assistant_reply = chat_with_ai(
-                    self.system_prompt,
-                    self.triggering_prompt,
-                    self.full_message_history,
-                    self.memory,
-                    cfg.fast_token_limit,
-                )  # TODO: This hardcodes the model to use GPT3.5. Make this an argument
+            # with Spinner("Thinking... "):
+            assistant_reply = chat_with_ai(
+                self.system_prompt,
+                self.triggering_prompt,
+                self.full_message_history,
+                self.memory,
+                cfg.fast_token_limit,
+            )  # TODO: This hardcodes the model to use GPT3.5. Make this an argument
 
             assistant_reply_json = fix_json_using_multiple_techniques(assistant_reply)
 
@@ -117,6 +117,9 @@ class Agent:
                     )
                     if console_input.lower().strip() == "y":
                         user_input = "GENERATE NEXT COMMAND JSON"
+                        break
+                    if console_input.lower().startswith("debug conv"):
+                        print(VicunaModel().conv.messages)
                         break
                     elif console_input.lower().strip() == "":
                         print("Invalid input format.")
