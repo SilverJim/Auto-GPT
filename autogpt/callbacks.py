@@ -6,7 +6,7 @@ import re
 import torch
 import transformers
 
-from config import Config
+from autogpt.config import Config
 cfg = Config()
 
 

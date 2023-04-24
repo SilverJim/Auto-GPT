@@ -16,8 +16,8 @@ openai.api_key = CFG.openai_api_key
 
 import os
 
-from llm_models import LocalModel
-from callbacks import Iteratorize, AutoGPTStoppingCriteria, Stream, clear_torch_cache
+from autogpt.llm_models import LocalModel
+from autogpt.callbacks import Iteratorize, AutoGPTStoppingCriteria, Stream, clear_torch_cache
 
 from itertools import groupby
 
@@ -185,8 +185,11 @@ def generate_vicuna_stream(model, prompt, tokenizer, params, device):
             reply = tokenizer.decode(output[-new_tokens:])
             yield reply
 
-def create_vicuna_completions(messages):
-    result = vicuna_interact(messages)
+def create_local_completions(messages):
+    if CFG.model_type == "vicuna":
+        result = vicuna_interact(messages)
+    else:
+        raise ValueError(f"Unknown model type {CFG.model_type}")
     if CFG.debug_mode:
         print("results", result)
     return result
@@ -205,7 +208,7 @@ def get_prompt_for_vicuna(messages, conv):
     prompt = conv.get_prompt()
     return prompt
 
-def vicuna_interact(messages, temperature=0.7, max_new_tokens=2048):
+def vicuna_interact(messages):
     # model_name = args.model_name
     instance = LocalModel()
     model = instance.model
@@ -223,13 +226,13 @@ def vicuna_interact(messages, temperature=0.7, max_new_tokens=2048):
     prompt = get_prompt_for_vicuna(messages, conv)
     print(prompt)
     params = {
-        "temperature": temperature,
-        "max_new_tokens": max_new_tokens,
-        "do_sample": True,
-        "top_p": 0.8,
-        "top_k": 0,
-        "typical_p": 0.19,
-        "repetition_penalty": 1.1,
+        "temperature": CFG.temperature,
+        "max_new_tokens": CFG.max_new_tokens,
+        "do_sample": CFG.do_sample,
+        "top_p": CFG.top_p,
+        "top_k": CFG.top_k,
+        "typical_p": CFG.typical_p,
+        "repetition_penalty": CFG.repetition_penalty,
         "stopping_criteria": [AutoGPTStoppingCriteria(tokenizer=tokenizer, prompt=prompt)],
     }
     pre = 0

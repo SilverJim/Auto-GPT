@@ -125,6 +125,9 @@ class Config(metaclass=Singleton):
         self.llm_device = os.getenv("LLM_DEVICE", "cuda")
         self.model_path = os.getenv("MODEL_PATH")
         self.checkpoint_path = os.getenv("CHECKPOINT_PATH")
+        self.wbit = int(os.getenv("WBIT", "4"))
+        self.group_size = int(os.getenv("GROUP_SIZE", "128"))
+        self.device_number = int(os.getenv("DEVICE_NUMBER", "0"))
         # self.temperature = float(os.getenv("TEMPERATURE", "0")) # Temperature has been defined in openai_api part.
         self.max_new_tokens = int(os.getenv("MAX_NEW_TOKENS", "2048"))
         self.do_sample = os.getenv("DO_SAMPLE", "True") == 'True'

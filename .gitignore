@@ -13,7 +13,7 @@ outputs/*
 ai_settings.yaml
 models
 .vscode
-run.sh
+start.sh
 repositories/*
 !repositories/Place_GPTQ_Llama_Here
 azure.yaml

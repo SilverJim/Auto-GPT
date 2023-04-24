@@ -1,4 +1,4 @@
-from config import Singleton, Config
+from autogpt.config import Singleton, Config
 
 cfg = Config()
 
@@ -27,22 +27,21 @@ else:
 
 class LocalModel(metaclass=Singleton):
     def __init__(self, max_tokens=512, max_batch_size=32):
-        model_name = cfg.vicuna_path
+        model_name = cfg.model_path
         llm_device = cfg.llm_device
-        num_gpus = 1  # cfg.num_gpus
-        load_8bit = False  # cfg.load_8bit
-        print("Loading Vicuna model...")
+        print("Loading Local model...")
 
     # Model
         llm_loader = cfg.llm_loader
         if llm_loader == "GPTQ-for-LLaMa":
             model, tokenizer = load_model_gptq_for_llama(
                 model_name, llm_device,
-                num_gpus, load_8bit, False
             )
             self.model = model
             self.tokenizer = tokenizer
         elif llm_loader == "transformers":
+            num_gpus = 1  # cfg.num_gpus
+            load_8bit = False  # cfg.load_8bit
             model, tokenizer = load_model_transformer(
                 model_name, llm_device,
                 num_gpus, load_8bit, False
@@ -102,14 +101,15 @@ def load_model_transformer(model_name, device, num_gpus, load_8bit=False, debug=
 
     return model, tokenizer
 
-def load_model_gptq_for_llama(model_name, device, num_gpus, load_8bit=False, debug=False):
+def load_model_gptq_for_llama(model_name, device):
     if device == "cuda":
         tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=False)
-        path_to_model = "models/TheBloke_vicuna-7B-1.1-GPTQ-4bit-128g"
-        pt_path = "models/TheBloke_vicuna-7B-1.1-GPTQ-4bit-128g/vicuna-7B-1.1-GPTQ-4bit-128g.safetensors"
-        wbits = 4
-        groupsize = 128
-        model = llama_inference.load_quant(str(path_to_model), str(pt_path), wbits, groupsize, device=0)
+        path_to_model = cfg.model_path
+        pt_path = cfg.checkpoint_path
+        wbits = cfg.wbit
+        group_size = cfg.group_size
+        device_number = cfg.device_number
+        model = llama_inference.load_quant(str(path_to_model), str(pt_path), wbits, group_size, device=device_number)
         model.to("cuda")
     else:
         raise ValueError(f"Invalid device: {device}")
