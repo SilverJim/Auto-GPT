@@ -16,7 +16,7 @@ openai.api_key = CFG.openai_api_key
 
 import os
 
-from llm_models import VicunaModel
+from llm_models import LocalModel
 from callbacks import Iteratorize, AutoGPTStoppingCriteria, Stream, clear_torch_cache
 
 from itertools import groupby
@@ -24,7 +24,7 @@ from itertools import groupby
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:768"
 cfg = Config()
 
-if CFG.use_vicuna:
+if CFG.is_local_llm:
     import torch
     from fastchat.conversation import SeparatorStyle, Conversation
 else:
@@ -101,8 +101,8 @@ def create_chat_completion(
     for attempt in range(num_retries):
         backoff = 2 ** (attempt + 2)
         try:
-            if CFG.use_vicuna:
-                return create_vicuna_completions(messages)
+            if CFG.is_local_llm:
+                return create_local_completions(messages)
             elif CFG.use_azure:
                 response = openai.ChatCompletion.create(
                     deployment_id=CFG.get_azure_deployment_id_for_model(model),
@@ -187,7 +187,7 @@ def generate_vicuna_stream(model, prompt, tokenizer, params, device):
 
 def create_vicuna_completions(messages):
     result = vicuna_interact(messages)
-    if CFG.debug:
+    if CFG.debug_mode:
         print("results", result)
     return result
 
@@ -207,7 +207,7 @@ def get_prompt_for_vicuna(messages, conv):
 
 def vicuna_interact(messages, temperature=0.7, max_new_tokens=2048):
     # model_name = args.model_name
-    instance = VicunaModel()
+    instance = LocalModel()
     model = instance.model
     conv =  Conversation(
             system="",
@@ -243,7 +243,7 @@ def vicuna_interact(messages, temperature=0.7, max_new_tokens=2048):
     print()
     conv.messages[-1][-1] = reply
     reply = reply.replace("\\_", "_").replace("\\n", "\n").replace("\\\\", "\\")
-    if CFG.debug:
+    if CFG.debug_mode:
         print(reply)
     return reply
 

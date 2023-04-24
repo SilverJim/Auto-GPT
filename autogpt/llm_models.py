@@ -2,7 +2,7 @@ from config import Singleton, Config
 
 cfg = Config()
 
-if cfg.use_vicuna:
+if cfg.is_local_llm:
     import torch
     from transformers import AutoTokenizer, AutoModelForCausalLM, AutoModel
 
@@ -25,7 +25,7 @@ else:
     replace_llama_attn_with_non_inplace_operations = None
 
 
-class VicunaModel(metaclass=Singleton):
+class LocalModel(metaclass=Singleton):
     def __init__(self, max_tokens=512, max_batch_size=32):
         model_name = cfg.vicuna_path
         llm_device = cfg.llm_device
@@ -34,17 +34,27 @@ class VicunaModel(metaclass=Singleton):
         print("Loading Vicuna model...")
 
     # Model
-        model, tokenizer = load_model(
-            model_name, llm_device,
-            num_gpus, load_8bit, False
-        )
-        self.model = model
-        self.tokenizer = tokenizer
-        print("Loaded Vicuna model!")
+        llm_loader = cfg.llm_loader
+        if llm_loader == "GPTQ-for-LLaMa":
+            model, tokenizer = load_model_gptq_for_llama(
+                model_name, llm_device,
+                num_gpus, load_8bit, False
+            )
+            self.model = model
+            self.tokenizer = tokenizer
+        elif llm_loader == "transformers":
+            model, tokenizer = load_model_transformer(
+                model_name, llm_device,
+                num_gpus, load_8bit, False
+            )
+            self.model = model
+            self.tokenizer = tokenizer
+        else:
+            raise ValueError("Invalid llm_loader.")
+        print(f"Loaded model using {llm_loader}!")
 
 
-
-def load_model(model_name, device, num_gpus, load_8bit=False, debug=False):
+def load_model_transformer(model_name, device, num_gpus, load_8bit=False, debug=False):
     if device == "cpu":
         kwargs = {}
     elif device == "cuda":
@@ -75,11 +85,8 @@ def load_model(model_name, device, num_gpus, load_8bit=False, debug=False):
         model = AutoModel.from_pretrained(model_name, trust_remote_code=True).half().cuda()
     else:
         tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=False)
-        path_to_model = "models/TheBloke_vicuna-7B-1.1-GPTQ-4bit-128g"
-        pt_path = "models/TheBloke_vicuna-7B-1.1-GPTQ-4bit-128g/vicuna-7B-1.1-GPTQ-4bit-128g.safetensors"
-        wbits = 4
-        groupsize = 128
-        model = llama_inference.load_quant(str(path_to_model), str(pt_path), wbits, groupsize, device=0)
+        model = AutoModelForCausalLM.from_pretrained(model_name,
+            low_cpu_mem_usage=True, **kwargs)
 
     # calling model.cuda() mess up weights if loading 8-bit weights
     if device == "cuda" and num_gpus == 1 and not load_8bit:
@@ -93,4 +100,18 @@ def load_model(model_name, device, num_gpus, load_8bit=False, debug=False):
     if debug:
         print(model)
 
+    return model, tokenizer
+
+def load_model_gptq_for_llama(model_name, device, num_gpus, load_8bit=False, debug=False):
+    if device == "cuda":
+        tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=False)
+        path_to_model = "models/TheBloke_vicuna-7B-1.1-GPTQ-4bit-128g"
+        pt_path = "models/TheBloke_vicuna-7B-1.1-GPTQ-4bit-128g/vicuna-7B-1.1-GPTQ-4bit-128g.safetensors"
+        wbits = 4
+        groupsize = 128
+        model = llama_inference.load_quant(str(path_to_model), str(pt_path), wbits, groupsize, device=0)
+        model.to("cuda")
+    else:
+        raise ValueError(f"Invalid device: {device}")
+      
     return model, tokenizer

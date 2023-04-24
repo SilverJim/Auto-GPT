@@ -482,8 +482,11 @@ See https://github.com/BillSchumacher/FastChat#vicuna-weights for more info on a
 Once you have a model with Vicuna weights applied you'll need to setup your .envs like so:
 
 ```
-USE_VICUNA=True
-VICUNA_PATH=<path to vicuna weights>
+IS_LOCAL_LLM=True
+LLM_LOADER=GPTQ-for-LLaMa
+MODEL_TYPE=vicuna
+MODEL_PATH=your-model-path
+CHECKPOINT_PATH=your-model-path/your-checkpoint-file-name(.pt or .safetensors)
 ```
 
 The path should be the output dir, not a specific file.

@@ -119,11 +119,19 @@ class Config(metaclass=Singleton):
         self.memory_index = os.getenv("MEMORY_INDEX", "auto-gpt")
         # Note that indexes must be created on db 0 in redis, this is not configurable.
 
-        self.use_vicuna = os.getenv("USE_VICUNA", "True") == 'True'
-        self.vicuna_path = os.getenv("VICUNA_PATH")
+        self.is_local_llm = os.getenv("IS_LOCAL_LLM", "True") == 'True'
+        self.llm_loader = os.getenv("LLM_LOADER", "GPTQ-for-LLaMa")
+        self.model_type = os.getenv("MODEL_TYPE", "vicuna")
         self.llm_device = os.getenv("LLM_DEVICE", "cuda")
-        self.tokenizer_path = os.getenv("TOKENIZER_PATH")
-        self.debug = os.getenv("DEBUG", "False") == 'True'
+        self.model_path = os.getenv("MODEL_PATH")
+        self.checkpoint_path = os.getenv("CHECKPOINT_PATH")
+        # self.temperature = float(os.getenv("TEMPERATURE", "0")) # Temperature has been defined in openai_api part.
+        self.max_new_tokens = int(os.getenv("MAX_NEW_TOKENS", "2048"))
+        self.do_sample = os.getenv("DO_SAMPLE", "True") == 'True'
+        self.top_p = float(os.getenv("TOP_P", "0.8"))
+        self.top_k = int(os.getenv("TOP_K", "0"))
+        self.typical_p = float(os.getenv("TYPICAL_P", "0.19"))
+        self.repetition_penalty = float(os.getenv("REPETITION_PENALTY", "1.1"))
 
         self.memory_backend = os.getenv("MEMORY_BACKEND", "local")
         # Initialize the OpenAI API client
@@ -186,10 +194,6 @@ class Config(metaclass=Singleton):
     def set_continuous_limit(self, value: int) -> None:
         """Set the continuous limit value."""
         self.continuous_limit = value
-
-    def set_debug(self, value: bool):
-        self.debug = value
-
 
     def set_speak_mode(self, value: bool) -> None:
         """Set the speak mode value."""

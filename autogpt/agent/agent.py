@@ -119,7 +119,7 @@ class Agent:
                         user_input = "GENERATE NEXT COMMAND JSON"
                         break
                     if console_input.lower().startswith("debug conv"):
-                        print(VicunaModel().conv.messages)
+                        print(LocalModel().conv.messages)
                         break
                     elif console_input.lower().strip() == "":
                         print("Invalid input format.")
