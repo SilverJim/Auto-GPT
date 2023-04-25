@@ -32,14 +32,14 @@ class _SentinelTokenStoppingCriteria(transformers.StoppingCriteria):
         return False
 
 class AutoGPTStoppingCriteria(transformers.StoppingCriteria):
-    def __init__(self, tokenizer, prompt):
+    def __init__(self, tokenizer, input_ids):
         self.regex = re.compile(r"\}\s*\}\s*\}")
         self.tokenizer = tokenizer
-        self.prompt_length = len(prompt)
+        self.input_ids_length = len(input_ids[0])
 
     def __call__(self, input_ids, scores):
-        text = self.tokenizer.decode(input_ids[0])
-        match = self.regex.search(text[self.prompt_length:])
+        text = self.tokenizer.decode(input_ids[0][self.input_ids_length:])
+        match = self.regex.search(text)
         stop = match is not None
         return stop
 

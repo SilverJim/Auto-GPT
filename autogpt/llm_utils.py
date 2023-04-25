@@ -27,10 +27,12 @@ cfg = Config()
 if CFG.is_local_llm:
     import torch
     from fastchat.conversation import SeparatorStyle, Conversation
+    from sentence_transformers import SentenceTransformer
 else:
     torch = None
     SeparatorStyle = None
     Conversation = None
+    SentenceTransformer = None
 
 
 
@@ -161,10 +163,11 @@ def create_chat_completion(
 
 
 def generate_vicuna_stream(model, prompt, tokenizer, params, device):
-    input_ids = tokenizer.encode(prompt, return_tensors="pt").to("cuda:0")
+    input_ids = tokenizer.encode(prompt, return_tensors="pt", add_special_tokens=True).to("cuda:0")
     generate_params = {}
     generate_params.update(params)
     generate_params["inputs"] = input_ids
+    generate_params["stopping_criteria"] = [AutoGPTStoppingCriteria(tokenizer=tokenizer, input_ids=input_ids)]
     
     def generate_with_callback(callback=None, **kwargs):
         kwargs['stopping_criteria'].insert(0, Stream(callback_func=callback))
@@ -233,7 +236,6 @@ def vicuna_interact(messages):
         "top_k": CFG.top_k,
         "typical_p": CFG.typical_p,
         "repetition_penalty": CFG.repetition_penalty,
-        "stopping_criteria": [AutoGPTStoppingCriteria(tokenizer=tokenizer, prompt=prompt)],
     }
     pre = 0
     reply = ""
@@ -249,6 +251,20 @@ def vicuna_interact(messages):
     if CFG.debug_mode:
         print(reply)
     return reply
+
+def create_embedding(text) -> list:
+    if CFG.is_local_llm:
+        return create_embedding_with_sentence_transformers(text)
+
+    else:
+        return create_embedding_with_ada(text)
+
+def create_embedding_with_sentence_transformers(text) -> list:
+    model = SentenceTransformer('all-MiniLM-L6-v2')
+    embeddings = model.encode([text])
+    del model
+    torch.cuda.empty_cache()
+    return list(embeddings[0])
 
 def create_embedding_with_ada(text) -> list:
     """Create an embedding with text-ada-002 using the OpenAI SDK"""

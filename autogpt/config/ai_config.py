@@ -104,8 +104,10 @@ class AIConfig:
         prompt_start = (
             "Your decisions must always be made independently without"
             " seeking user assistance. Play to your strengths as an LLM and pursue"
-            " simple strategies with no legal complications."
-            ""
+            " simple strategies with no legal complications.\n"
+            "You MUST remember all the content in GOALS and COMMANDS, "
+            "because your purpose is achieve the goal with help of these command, "
+            "and you need them later, it is important."
         )
 
         from autogpt.prompt import get_prompt

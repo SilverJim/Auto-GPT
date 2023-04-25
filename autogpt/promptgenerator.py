@@ -3,7 +3,8 @@ from __future__ import annotations
 
 import json
 from typing import Any
-
+from autogpt.config import Config
+cfg = Config()
 
 class PromptGenerator:
     """
@@ -73,10 +74,15 @@ class PromptGenerator:
         Returns:
             str: The formatted command string.
         """
-        args_string = ", ".join(
-            f'"{key}": "{value}"' for key, value in command["args"].items()
-        )
-        return f'{command["label"]}: "{command["name"]}", args: {args_string}'
+        if cfg.is_local_llm:
+            # Local LLM has shorter context token size
+            args_string = json.dumps(command["args"])
+            return f'"{command["name"]}", args: {args_string}'
+        else:
+            args_string = ", ".join(
+                f'"{key}": "{value}"' for key, value in command["args"].items()
+            )
+            return f'{command["label"]}: "{command["name"]}", args: {args_string}'
 
     def add_resource(self, resource: str) -> None:
         """
